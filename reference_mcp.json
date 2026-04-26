@@ -1,0 +1,8 @@
+
+{
+  "senior-tools": {
+    "command": "python",
+    "args": ["c:\\Users\\i\\git\\AgentLoop\\senior_tools.py"],
+    "cwd": "."
+  }
+}

@@ -1,0 +1,83 @@
+# Include only what's necessary
+# Exclude everything by default
+*
+# Exclude all folders
+*/
+# Exclude all temporary and configuration files
+.*
+
+# Include specific files and folders
+!.gitignore
+!.gitignore.example
+!*.py
+!*.mdc
+!requirements.txt
+!reference_mcp.json
+!docs/
+!docs/*.md
+!images/
+!images/*.png
+!sounds/
+!sounds/*.wav
+!styles/
+!styles/*.qss
+!tests/
+!tests/*.py
+!src/
+!src/*.py
+!*.png
+!sounds/
+!sounds/*.wav
+!.env.example
+!config/
+!config/*.json
+!config/*.md
+!commands/
+!commands/*.json
+
+# Explicitly exclude
+memo/
+.github/
+logs/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv/
+venv/
+ENV/
+.idea/
+.vscode/
+.roo/
+.mcp.json
+.roomodes
+.taskmaster/
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment variables
+.env
+.venv/
+venv/
+ENV/
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# MCP specific
+.cursor/
+.roo/
+.roomodes
+.taskmaster/
+
+# OS specific
+.DS_Store
+Thumbs.db

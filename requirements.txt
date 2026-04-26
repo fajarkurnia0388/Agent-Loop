@@ -1,0 +1,24 @@
+# Core dependencies (cross-platform)
+fastmcp
+google-generativeai
+google-genai
+python-dotenv
+Pillow
+PyQt6
+PyQt6-WebEngine
+playsound==1.2.2
+numpy
+openai
+
+# Testing dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# Windows-specific dependencies for focus_cursor.py
+pywinauto>=0.6.8; sys_platform == "win32"  # Windows GUI automation
+pywin32>=306; sys_platform == "win32"      # Windows API access
+
+# Linux-specific dependencies for focus_cursor.py
+python-xlib>=0.31; sys_platform == "linux"  # X11 window system interaction
+pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"  # macOS window management
+pyobjc-framework-Quartz>=10.0; sys_platform == "darwin"  # macOS keyboard events
