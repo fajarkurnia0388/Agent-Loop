@@ -1347,10 +1347,10 @@ class ModernTaskMasterDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)  # No margins needed with transparent bg
 
         # Main content container with padding
-        main_container = QFrame()
-        main_container.setProperty("containerType", "main")
-        main_container.setObjectName("mainContainer")  # Add object name for styling
-        container_layout = QVBoxLayout(main_container)
+        self.main_container = QFrame()
+        self.main_container.setProperty("containerType", "main")
+        self.main_container.setObjectName("mainContainer")  # Add object name for styling
+        container_layout = QVBoxLayout(self.main_container)
         container_layout.setContentsMargins(24, 24, 24, 24)
         container_layout.setSpacing(16)
 
@@ -1369,16 +1369,26 @@ class ModernTaskMasterDialog(QDialog):
         # Buttons
         self.create_buttons(container_layout)
 
-        layout.addWidget(main_container)
+        # Enable dragging from container and header
+        self.main_container.mousePressEvent = self.mousePressEvent
+        self.main_container.mouseMoveEvent = self.mouseMoveEvent
+        self.main_container.mouseReleaseEvent = self.mouseReleaseEvent
+
+        if hasattr(self, "header_frame"):
+            self.header_frame.mousePressEvent = self.mousePressEvent
+            self.header_frame.mouseMoveEvent = self.mouseMoveEvent
+            self.header_frame.mouseReleaseEvent = self.mouseReleaseEvent
+
+        layout.addWidget(self.main_container)
 
         # Note: Focus is set in showEvent() to ensure it works after dialog is fully displayed
 
     def create_header(self, layout):
         """Create professional header"""
-        header_frame = QFrame()
-        header_frame.setProperty("panelType", "header")
-        header_frame.setMaximumHeight(48)
-        header_layout = QHBoxLayout(header_frame)
+        self.header_frame = QFrame()
+        self.header_frame.setProperty("panelType", "header")
+        self.header_frame.setMaximumHeight(48)
+        header_layout = QHBoxLayout(self.header_frame)
         header_layout.setContentsMargins(16, 8, 16, 8)
         header_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
@@ -1386,6 +1396,7 @@ class ModernTaskMasterDialog(QDialog):
         title = QLabel()
         title.setProperty("labelType", "title")
         title.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         # Ensure consistent visual height regardless of theme/DPI (Qt6)
         try:
             title.setFixedHeight(32)
@@ -1407,6 +1418,7 @@ class ModernTaskMasterDialog(QDialog):
         status_label = QLabel("● Active")
         status_label.setProperty("labelType", "status")
         status_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        status_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         header_layout.addWidget(status_label)
 
         # Close button
@@ -1418,7 +1430,7 @@ class ModernTaskMasterDialog(QDialog):
         close_btn.setToolTip("Close")
         header_layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignVCenter)  # Qt6
 
-        layout.addWidget(header_frame)
+        layout.addWidget(self.header_frame)
 
     def _init_rounded_corners(self) -> None:
         """Enable rounded corners using Qt mask only.
@@ -3202,14 +3214,32 @@ Return only the improved text, no explanations."""
     def mousePressEvent(self, event):
         """Handle mouse press for window dragging"""
         if event.button() == Qt.MouseButton.LeftButton:
-            self.drag_position = (
-                event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            )
+            # Use startSystemMove for better performance and compatibility (Linux/WSL)
+            # This is the modern way in Qt 5.15+ and Qt 6 for frameless windows
+            try:
+                # Ensure we have a valid window handle
+                if self.windowHandle():
+                    self.windowHandle().startSystemMove()
+                else:
+                    # Fallback to manual dragging if window handle is not yet available
+                    self.drag_position = (
+                        event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                    )
+            except (AttributeError, Exception):
+                # Fallback for older versions or unexpected errors
+                self.drag_position = (
+                    event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                )
             event.accept()
 
     def mouseMoveEvent(self, event):
         """Handle mouse move for window dragging"""
-        if event.buttons() == Qt.MouseButton.LeftButton and self.drag_position:
+        # Manual move is only used as fallback when startSystemMove is not used
+        if (
+            event.buttons() == Qt.MouseButton.LeftButton
+            and hasattr(self, "drag_position")
+            and self.drag_position
+        ):
             self.move(event.globalPosition().toPoint() - self.drag_position)
             event.accept()
 
