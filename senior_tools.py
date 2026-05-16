@@ -1379,6 +1379,10 @@ class ModernTaskMasterDialog(QDialog):
             self.header_frame.mouseMoveEvent = self.mouseMoveEvent
             self.header_frame.mouseReleaseEvent = self.mouseReleaseEvent
 
+        # Enable drag and drop
+        self.setAcceptDrops(True)
+        self.main_container.setAcceptDrops(True)
+
         layout.addWidget(self.main_container)
 
         # Note: Focus is set in showEvent() to ensure it works after dialog is fully displayed
@@ -1972,65 +1976,73 @@ class ModernTaskMasterDialog(QDialog):
         self.sparkle_button = QToolButton(self.response_text)
         self.sparkle_button.setObjectName("sparkleIcon")
         self.sparkle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.sparkle_button.setToolTip("Enhanced with AI")
+        self.sparkle_button.setToolTip("Enhanced with AI (Ctrl+I)")
         self.sparkle_button.clicked.connect(self.improve_with_ai)
+
+        # Create attach image button next to sparkle
+        self.attach_button = QToolButton(self.response_text)
+        self.attach_button.setObjectName("attachIcon")
+        self.attach_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.attach_button.setToolTip("Attach Image (Drag & Drop supported)")
+        self.attach_button.setText("📎")
+        self.attach_button.clicked.connect(self.open_file_dialog)
+
         try:
-            self.sparkle_button.setFlat(True)
-            self.sparkle_button.setAttribute(
-                Qt.WidgetAttribute.WA_TranslucentBackground, True
-            )
-            self.sparkle_button.setAttribute(
-                Qt.WidgetAttribute.WA_NoSystemBackground, True
-            )
+            for btn in [self.sparkle_button, self.attach_button]:
+                btn.setFlat(True)
+                btn.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+                btn.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+                btn.setAutoRaise(True)
+                btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         except Exception:
-            pass  # Qt6
+            pass
 
-        # Load sparkle icon via unified helper and set size
+        # Load sparkle icon
         from PyQt6.QtCore import QSize
-
         try:
             self._update_sparkle_icon()
             self.sparkle_button.setIconSize(QSize(24, 24))
-            # Explicitly ensure the button palette has transparent base
-            try:
-                from PyQt6.QtGui import QPalette
-
-                pal = self.sparkle_button.palette()
-                pal.setColor(QPalette.Button, Qt.transparent)
-                pal.setColor(QPalette.Base, Qt.transparent)
-                self.sparkle_button.setPalette(pal)
-            except Exception:
-                pass
         except Exception:
             self.sparkle_button.setText("✨")
 
-        # Style and padding to keep text clear of the icon (fully transparent, no borders)
-        self.sparkle_button.setAutoRaise(True)
-        self.sparkle_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        # Apply theme-aware hover effects
-        self.sparkle_button.setStyleSheet(self._get_sparkle_hover_style())
+        # Style attach button
+        self.attach_button.setStyleSheet("""
+            QToolButton {
+                color: #8b949e;
+                font-size: 18px;
+                border: none;
+                background: transparent;
+            }
+            QToolButton:hover {
+                color: #58a6ff;
+            }
+        """)
 
-        # Reserve space on the right so text doesn't overlap the icon (24px + padding)
-        self.response_text.setViewportMargins(0, 0, 44, 0)
+        # Reserve space on the right (increased for two buttons: 24+24 + padding)
+        self.response_text.setViewportMargins(0, 0, 70, 0)
 
-        # Position the icon initially and keep it vertically centered on input
-        def position_sparkle():
+        # Position the icons
+        def position_icons():
             try:
                 h = self.response_text.height()
                 icon_size = 24
                 right_padding = 10
+                spacing = 8
                 top = (h - icon_size) // 2
-                left = self.response_text.width() - icon_size - right_padding
-                self.sparkle_button.setGeometry(left, top, icon_size, icon_size)
+
+                # Sparkle button (rightmost)
+                sparkle_left = self.response_text.width() - icon_size - right_padding
+                self.sparkle_button.setGeometry(sparkle_left, top, icon_size, icon_size)
+
+                # Attach button (to the left of sparkle)
+                attach_left = sparkle_left - icon_size - spacing
+                self.attach_button.setGeometry(attach_left, top, icon_size, icon_size)
             except Exception:
                 pass
 
-        # Save reference for eventFilter-triggered positioning
-        self._position_sparkle_on_response_text = position_sparkle
-
-        # Position once now and again after layout settles
-        position_sparkle()
-        QTimer.singleShot(100, position_sparkle)  # Delay to ensure layout is complete
+        self._position_sparkle_on_response_text = position_icons
+        position_icons()
+        QTimer.singleShot(100, position_icons)
 
         response_layout.addWidget(self.response_text)
 
@@ -2361,6 +2373,70 @@ class ModernTaskMasterDialog(QDialog):
                 pass
             return False  # Allow normal paste on error if no image
 
+    def dragEnterEvent(self, event):
+        """Handle drag enter event for image files"""
+        if event.mimeData().hasUrls():
+            # Check if any of the URLs are images
+            has_image = False
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")):
+                    has_image = True
+                    break
+            
+            if has_image:
+                event.acceptProposedAction()
+                # Optional: visual feedback
+                self.setProperty("isDragging", True)
+                self.style().unpolish(self)
+                self.style().polish(self)
+
+    def dragLeaveEvent(self, event):
+        """Handle drag leave event"""
+        self.setProperty("isDragging", False)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def dropEvent(self, event):
+        """Handle drop event for image files"""
+        self.setProperty("isDragging", False)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        
+        if event.mimeData().hasUrls():
+            added_any = False
+            for url in event.mimeData().urls():
+                file_path = url.toLocalFile()
+                if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")):
+                    if image_manager.add_image_from_file(file_path):
+                        added_any = True
+            
+            if added_any:
+                self.update_image_status()
+                self.update_images_display()
+                event.acceptProposedAction()
+
+    def open_file_dialog(self):
+        """Open file dialog to attach images"""
+        from PyQt6.QtWidgets import QFileDialog
+        
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Images",
+            "",
+            "Images (*.png *.jpg *.jpeg *.gif *.bmp *.webp);;All Files (*)"
+        )
+        
+        if file_paths:
+            added_any = False
+            for path in file_paths:
+                if image_manager.add_image_from_file(path):
+                    added_any = True
+            
+            if added_any:
+                self.update_image_status()
+                self.update_images_display()
+
     def center_on_screen(self):
         """Center dialog on screen"""
         screen = QApplication.primaryScreen().geometry()
@@ -2466,7 +2542,11 @@ class ModernTaskMasterDialog(QDialog):
         while self.images_layout.count():
             child = self.images_layout.takeAt(0)
             if child.widget():
-                child.widget().deleteLater()  # Properly destroy widgets
+                child.widget().deleteLater()
+        
+        # Force garbage collection to free image memory
+        import gc
+        gc.collect()
 
         total_images = len(image_manager.image_descriptions) + len(
             image_manager.pending_images
@@ -2567,19 +2647,14 @@ class ModernTaskMasterDialog(QDialog):
         self.images_layout.addWidget(container, row, col)
 
     def create_image_preview(self, index, is_described):
-        """Create an image preview for grid layout"""
+        """Create an image preview for grid layout using thumbnails"""
         try:
-            # Get the actual image
-            image = None
-            if is_described:
-                # For described images, get from processed images
-                if index < len(image_manager.processed_images):
-                    image = image_manager.processed_images[index]
+            # Use thumbnail for preview - CRITICAL for WSLg performance/stability
+            thumbnails = image_manager.get_thumbnails()
+            if index < len(thumbnails):
+                image = thumbnails[index]
             else:
-                # For pending images
-                pending_index = index - len(image_manager.image_descriptions)
-                if 0 <= pending_index < len(image_manager.pending_images):
-                    image = image_manager.pending_images[pending_index]
+                image = None
 
             if image:
                 # Convert PIL image to QPixmap for display

@@ -50,6 +50,28 @@ class ImageDescriptionManager:
     
     
     
+    def add_image_from_file(self, file_path: str) -> bool:
+        """
+        Load an image from a file path and add it to the queue
+        Returns: True if successfully added, False otherwise
+        """
+        try:
+            image = Image.open(file_path)
+            # Force load to ensure file is valid and can be closed
+            image.load()
+            
+            with self._lock:
+                if not self._can_accept_more(image):
+                    return False
+                if self._is_duplicate(image):
+                    return True
+                self.pending_images.append(image)
+                self._add_to_thumb_cache(image)
+            return True
+        except Exception as e:
+            print(f"Error loading image from file {file_path}: {e}")
+            return False
+
     def clear_descriptions(self) -> None:
         """Limpia todas las descripciones pendientes"""
         with self._lock:
@@ -106,30 +128,23 @@ class ImageDescriptionManager:
             return []
 
     def _can_accept_more(self, new_img: Image.Image) -> bool:
+        """Check if we can accept more images based on count and estimated size"""
         if len(self.pending_images) + len(self.processed_images) >= self._max_images:
             return False
+            
+        # Optimization: Use a fast estimate instead of re-encoding everything to JPEG
+        # Estimated bytes = width * height * 3 (for RGB) / 10 (rough JPEG compression factor)
         try:
-            # Rough size estimate via JPEG in-memory encoding
-            from io import BytesIO
-            buf = BytesIO()
-            ni = new_img
-            if ni.mode != 'RGB':
-                ni = ni.convert('RGB')
-            ni.save(buf, format='JPEG', quality=85, optimize=True)
-            new_bytes = buf.tell()
-        except Exception:
-            new_bytes = 500000  # heuristic fallback
-        total_est = new_bytes
-        try:
+            def estimate_size(img):
+                return (img.width * img.height * 3) // 10
+                
+            total_est = estimate_size(new_img)
             for im in self.pending_images + self.processed_images:
-                buf = BytesIO()
-                t = im
-                if t.mode != 'RGB':
-                    t = t.convert('RGB')
-                t.save(buf, format='JPEG', quality=85, optimize=True)
-                total_est += buf.tell()
+                total_est += estimate_size(im)
+                
+            return total_est <= self._max_total_bytes
         except Exception:
-            pass
-        return total_est <= self._max_total_bytes
+            # Fallback to simple count check if estimation fails
+            return len(self.pending_images) + len(self.processed_images) < self._max_images
     
 image_manager = ImageDescriptionManager()
